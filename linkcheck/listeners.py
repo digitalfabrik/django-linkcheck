@@ -23,6 +23,7 @@ tests_running = len(sys.argv) > 1 and sys.argv[1] == 'test' or sys.argv[0].endsw
 
 def linkcheck_worker(block=True):
     global worker_running
+    logger.debug("Starting worker%s (tasks_queue at %i)", " blocking" if block else "", tasks_queue.qsize())
     while tasks_queue.not_empty:
         try:
             task = tasks_queue.get(block=block)
@@ -31,6 +32,13 @@ def linkcheck_worker(block=True):
         # An error in any task should not stop the worker from continuing with the queue
         try:
             task['target'](*task['args'], **task['kwargs'])
+            logger.debug(
+                "Worker successfully ran %s with args=%r and kwargs=%r (tasks_queue at %i)",
+                task['target'].__name__,
+                task['args'],
+                task['kwargs'],
+                tasks_queue.qsize(),
+            )
         except Exception as e:
             logger.exception(
                 "%s while running %s with args=%r and kwargs=%r: %s",
@@ -42,6 +50,7 @@ def linkcheck_worker(block=True):
             )
         tasks_queue.task_done()
     worker_running = False
+    logger.debug("Worker is done")
 
 
 def start_worker():
@@ -112,12 +121,26 @@ def check_instance_links(sender, instance, **kwargs):
     # Don't run in a separate thread if we are running tests
     if tests_running:
         do_check_instance_links(sender, instance)
+        logger.debug(
+            "Ran task inline: %s with args=%r and kwargs=%r",
+            do_check_instance_links.__name__,
+            (sender, instance),
+            {},
+        )
     else:
-        tasks_queue.put({
+        task = {
             'target': do_check_instance_links,
             'args': (sender, instance, True),
             'kwargs': {}
-        })
+        }
+        tasks_queue.put(task)
+        logger.debug(
+            "Submitted task %s with args=%r and kwargs=%r (tasks_queue at %i)",
+            task['target'].__name__,
+            task['args'],
+            task['kwargs'],
+            tasks_queue.qsize(),
+        )
         start_worker()
 
 
@@ -175,12 +198,26 @@ def instance_post_save(sender, instance, **kwargs):
 
     if tests_running:
         do_instance_post_save(sender, instance, **kwargs)
+        logger.debug(
+            "Ran task inline: %s with args=%r and kwargs=%r",
+            do_instance_post_save.__name__,
+            (sender, instance),
+            kwargs,
+        )
     else:
-        tasks_queue.put({
+        task = {
             'target': do_instance_post_save,
             'args': (sender, instance),
             'kwargs': kwargs
-        })
+        }
+        tasks_queue.put(task)
+        logger.debug(
+            "Submitted task %s with args=%r and kwargs=%r (tasks_queue at %i)",
+            task['target'].__name__,
+            task['args'],
+            task['kwargs'],
+            tasks_queue.qsize(),
+        )
         start_worker()
 
 
