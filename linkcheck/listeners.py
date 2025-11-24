@@ -96,6 +96,9 @@ def check_instance_links(sender, instance, **kwargs):
 
                 if len(url) > MAX_URL_LENGTH:
                     # We cannot handle url longer than MAX_URL_LENGTH at the moment
+                    if url.startswith("data:"):
+                        # If the URL is a data URL, it might occupy a LOT of space in the logs without being useful – truncate it
+                        url = url[:64]
                     logger.warning('URL exceeding max length will be skipped: %s', url)
                     continue
 
