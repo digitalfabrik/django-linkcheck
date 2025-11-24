@@ -99,7 +99,7 @@ def check_instance_links(sender, instance, **kwargs):
                     if url.startswith("data:"):
                         # If the URL is a data URL, it might occupy a LOT of space in the logs without being useful – truncate it
                         url = url[:64]
-                    logger.warning('URL exceeding max length will be skipped: %s', url)
+                    logger.warning('URL exceeding max length will be skipped: %s  (in %r)', url, instance)
                     continue
 
                 u, created = Url.objects.get_or_create(url=url)
