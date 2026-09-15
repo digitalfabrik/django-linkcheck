@@ -410,7 +410,7 @@ class Url(models.Model):
                     # Re-raise exception if it's definitely not a false positive
                     raise
             # If HEAD is not allowed, let's try with GET
-            if response.status_code in [HTTPStatus.BAD_REQUEST, HTTPStatus.METHOD_NOT_ALLOWED]:
+            if response.status_code in [HTTPStatus.BAD_REQUEST, HTTPStatus.METHOD_NOT_ALLOWED, HTTPStatus.NOT_FOUND]:
                 logger.debug("HEAD is not allowed, retry with GET")
                 fetch = requests.get
                 response = fetch(self.external_url, **request_params)
