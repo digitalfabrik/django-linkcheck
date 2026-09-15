@@ -443,6 +443,32 @@ class Url(models.Model):
             self.message = f"Other Error: {e}"
             self.error_message = str(e)
         else:
+            # If any hop in the (already-followed) redirect chain was a plain
+            # HTTP request whose response declares HSTS, a real browser would
+            # never have sent that request in the first place - it upgrades
+            # to HTTPS locally, for that exact host, before connecting at all.
+            # The server's own HTTP-only redirect chain may lead somewhere
+            # unrelated to the real page (e.g. a legacy firewall/auth
+            # gateway), so mirror the browser and recheck directly against
+            # the HTTPS equivalent of the first such hop instead of trusting
+            # where the HTTP-only path leads.
+            for hop in (*response.history, response):
+                if hop.url.startswith("http://") and hop.headers.get(
+                    "Strict-Transport-Security",
+                ):
+                    https_url = "https://" + hop.url[len("http://") :]
+                    logger.debug(
+                        "Server declares HSTS, rechecking %s instead", https_url,
+                    )
+                    try:
+                        response = fetch(https_url, **request_params)
+                        self.ssl_status = True
+                    except ConnectionError:
+                        logger.debug(
+                            "HTTPS recheck failed, falling back to HTTP result",
+                        )
+                    break
+
             self.status = response.status_code < 300
             self.message = f"{response.status_code} {response.reason}"
             logger.debug("Response message: %s", self.message)
